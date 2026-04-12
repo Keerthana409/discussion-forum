@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevForum - App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .indicator-safe { color: var(--success); font-weight: 600; }
+        .indicator-spam { color: var(--danger); font-weight: 600; }
+    </style>
+</head>
+<body class="app-body">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fa-brands fa-dev" style="font-size: 1.8rem;"></i> <span>DevForum</span>
+        </div>
+        <div class="nav-user">
+            <button class="theme-toggle-btn" id="theme-toggle" title="Toggle Dark Mode">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+            <div class="notifications" style="position: relative; cursor: pointer;">
+                <i class="fa-solid fa-bell" style="font-size: 1.2rem;"></i>
+                <span id="notif-count" class="badge badge-danger hidden" style="position: absolute; top: -8px; right: -8px;">0</span>
+            </div>
+            <span id="user-greeting" style="font-weight: 500; margin-left:0.5rem; display:none;">Welcome</span>
+            <button id="home-btn" class="btn btn-outline btn-sm" style="margin-left:0.5rem; display:none;">Home</button>
+            <button id="admin-nav" class="btn btn-primary btn-sm hidden" style="margin-left:0.5rem;">Admin Panel</button>
+            <button id="logout-btn" class="btn btn-outline btn-sm" style="margin-left:0.5rem;">Log Out</button>
+        </div>
+    </nav>
+
+    <div class="app-container">
+        <!-- Main Content -->
+        <main class="main-content" style="width: 100%; max-width: 800px; margin: 0 auto;">
+            
+            <!-- Feed Section -->
+            <section id="feed-section" class="tab-pane active">
+                
+                <div class="card">
+                    <input type="text" id="create-post-trigger" placeholder="Create a new post..." class="form-group" style="margin:0; width:100%; padding:0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius); cursor: pointer; background: var(--bg-light); color: var(--text-dark);" readonly>
+                </div>
+
+                <div class="card filter-container" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; padding: 0.5rem 1rem;">
+                    <div class="filter-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="filter-btn active" data-filter="latest">Latest Posts</button>
+                        <button class="filter-btn" data-filter="top">Top Discussions</button>
+                        <button class="filter-btn" data-filter="flagged">Flagged</button>
+                        <button class="filter-btn" data-filter="safe">Safe</button>
+                    </div>
+                    <div style="flex:1;"></div>
+                    <div style="display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 999px; padding: 0.3rem 0.8rem; background: var(--bg-card);">
+                        <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted)"></i>
+                        <input type="text" id="search-input" placeholder="Search by title, content, or tags..." style="border:none; outline:none; background:transparent; margin-left: 0.5rem; color: var(--text-dark); width: 200px;">
+                    </div>
+                </div>
+
+                <div id="create-post-card" class="card hidden">
+                    <h3 style="margin-bottom: 1rem;">Create a Post</h3>
+                    <form id="create-post-form">
+                        <div class="form-group">
+                            <input type="text" id="post-title" placeholder="Title" required style="font-weight: 600; font-size: 1.1rem;">
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="post-tags" placeholder="Tags (comma separated) e.g., Javascript, Help" required>
+                        </div>
+                        <div class="form-group">
+                            <textarea id="post-content" placeholder="Share your knowledge..." rows="5" required></textarea>
+                        </div>
+                        <div class="form-group" style="display: flex; gap: 1rem; align-items:flex-end; flex-wrap: wrap;">
+                            <div>
+                                <label for="post-image" style="font-size: 0.9rem;">Attach an Image (Optional):</label>
+                                <input type="file" id="post-image" accept="image/*" style="padding: 0.5rem; background: var(--bg-light); border: 1px dashed var(--border-color); cursor: pointer;">
+                            </div>
+                            <div id="image-preview-container" class="hidden" style="display: flex; align-items:flex-start;">
+                                <img id="image-preview" src="" alt="Preview" style="max-height: 80px; max-width: 150px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border-color);">
+                                <button type="button" id="clear-image-btn" class="btn btn-sm" style="background: var(--bg-card); color:var(--danger); border:1px solid var(--danger); border-radius:50%; width: 24px; height: 24px; padding:0; display:flex; align-items:center; justify-content:center; margin-left: 0.5rem; cursor:pointer;" title="Clear Image">&times;</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Real-time UI indicator -->
+                        <div style="margin-bottom: 1rem; padding: 0.5rem; border-radius:4px; background: var(--bg-light); border: 1px solid var(--border-color); display:flex; justify-content: space-between;">
+                            <div>Status: <span id="spam-status-ui" class="indicator-safe">✅ Safe Content</span></div>
+                            <div style="font-size: 0.9rem; color: var(--text-muted);">Score: <span id="spam-score-ui">0</span>/10</div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                            <button type="button" id="cancel-post-btn" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Publish Post</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="posts-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <!-- JS renders posts here -->
+                </div>
+            </section>
+
+            <!-- Admin Section -->
+            <section id="admin-section" class="tab-pane hidden">
+                <div class="section-header">
+                    <h2>Admin Dashboard</h2>
+                </div>
+                
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+                    <div class="stats-card">
+                        <h4 style="color: var(--text-muted);">Total Posts</h4>
+                        <h2 id="stat-posts" style="color: var(--text-dark); font-size: 2rem;">0</h2>
+                    </div>
+                    <div class="stats-card" style="border-bottom: 3px solid var(--danger);">
+                        <h4 style="color: var(--text-muted);">Spam Posts</h4>
+                        <h2 id="stat-spam" style="color: var(--danger); font-size: 2rem;">0</h2>
+                    </div>
+                    <div class="stats-card" style="border-bottom: 3px solid var(--danger);">
+                        <h4 style="color: var(--text-muted);">Removed Posts</h4>
+                        <h2 id="stat-removed" style="color: var(--danger); font-size: 2rem;">0</h2>
+                    </div>
+                    <div class="stats-card" style="border-bottom: 3px solid var(--warning);">
+                        <h4 style="color: var(--text-muted);">Reported Posts</h4>
+                        <h2 id="stat-reported" style="color: var(--warning); font-size: 2rem;">0</h2>
+                    </div>
+                    <div class="stats-card" style="border-bottom: 3px solid var(--danger);">
+                        <h4 style="color: var(--text-muted);">Suspicious Users</h4>
+                        <h2 id="stat-suspicious" style="color: var(--danger); font-size: 2rem;">0</h2>
+                    </div>
+                </div>
+                
+                <h3 style="margin: 1.5rem 0 1rem 0;"><i class="fa-solid fa-flag" style="color: var(--warning)"></i> Report Queue</h3>
+                <div id="report-queue-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 2rem;">
+                    <!-- JS populates report queue -->
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0 1rem 0;">
+                    <h3>Manage All Posts</h3>
+                    <select id="admin-post-filter" style="padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-dark); font-weight: 500;">
+                        <option value="all">All Posts</option>
+                        <option value="safe">Safe Only</option>
+                        <option value="under review">Under Review Only</option>
+                        <option value="removed">Removed Only</option>
+                    </select>
+                </div>
+                <div id="manage-posts-table" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 2rem;">
+                    <!-- Javascript populates standard admin posts list here -->
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0 1rem 0;">
+                    <h3><i class="fa-solid fa-chart-line" style="color: var(--primary-color)"></i> Daily Usage Analytics</h3>
+                </div>
+                <div id="usage-analytics-container" style="display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden;">
+                    <!-- JS populates daily usage -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Usage Warning Modal -->
+    <div id="usage-warning-overlay" class="usage-warning-overlay hidden">
+        <div class="usage-warning-popup">
+            <h2 style="color: var(--warning); margin-bottom: 1rem;"><i class="fa-solid fa-triangle-exclamation"></i> Time Warning</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--text-dark);">⚠️ You’ve spent 30 minutes on the forum.</p>
+            <p style="color: var(--text-muted);">Please take a break!</p>
+            <button id="close-warning-btn" class="btn btn-primary" style="margin-top: 1.5rem;">I Understand</button>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/forum.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        // Init global logic
+        if(!localStorage.getItem('nexus_user')) {
+            window.location.href = 'index.html';
+        } else {
+            const user = JSON.parse(localStorage.getItem('nexus_user'));
+            const greet = document.getElementById('user-greeting');
+            greet.innerText = `${user.username}`;
+            greet.style.display = 'inline-block';
+            if(user.role === 'admin' || user.role === 'moderator') {
+                const nav = document.getElementById('admin-nav');
+                nav.classList.remove('hidden');
+                
+                // Routing Logic for buttons
+                nav.addEventListener('click', () => {
+                    document.getElementById('feed-section').classList.add('hidden');
+                    document.getElementById('admin-section').classList.remove('hidden');
+                    document.getElementById('home-btn').style.display = 'inline-block';
+                    if(window.renderAdminPanel) window.renderAdminPanel();
+                });
+                
+                const home = document.getElementById('home-btn');
+                home.addEventListener('click', () => {
+                    document.getElementById('admin-section').classList.add('hidden');
+                    document.getElementById('feed-section').classList.remove('hidden');
+                    home.style.display = 'none';
+                    if(window.renderPosts) window.renderPosts();
+                });
+            }
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('nexus_user');
+            window.location.href = 'index.html';
+        });
+
+        // Dark Mode Toggle
+        const themeBtn = document.getElementById('theme-toggle');
+        const isDark = localStorage.getItem('nexus_theme') === 'dark';
+        if(isDark) {
+            document.body.classList.add('dark-mode');
+            themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+        }
+
+        themeBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if(document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('nexus_theme', 'dark');
+                themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+            } else {
+                localStorage.setItem('nexus_theme', 'light');
+                themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+            }
+        });
+    </script>
+</body>
+</html>
