@@ -1,6 +1,5 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:5000/api'
-    : `http://${window.location.hostname}:5000/api`;
+// Core Relative API URL strictly tracking deployed host natively
+const API_URL = '/api';
 
 const api = {
     getToken: () => localStorage.getItem('nexus_token'),

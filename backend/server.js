@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -21,6 +22,12 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/usage', require('./routes/usage'));
+
+// Serve frontend natively mapping to root
+app.use(express.static(path.join(__dirname, '../')));
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, '../index.html'));
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
