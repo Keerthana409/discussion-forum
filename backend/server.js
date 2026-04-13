@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 app.use(cors());
@@ -22,6 +22,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/usage', require('./routes/usage'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Serve frontend natively mapping to root
 app.use(express.static(path.join(__dirname, '../')));

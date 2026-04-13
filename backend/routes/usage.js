@@ -21,4 +21,13 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+router.get('/', auth, async (req, res) => {
+    try {
+        const usage = await Usage.find({ username: req.user.username }).sort({ date: 1 });
+        res.json(usage);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
 module.exports = router;

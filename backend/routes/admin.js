@@ -47,6 +47,10 @@ router.patch('/post/:id', auth, adminAuth, async (req, res) => {
             post.hasReport = false;
         } else if(action === 'remove') {
             post.status = 'removed';
+        } else if(action === 'hide') {
+            post.status = 'hidden';
+        } else if(action === 'spam') {
+            post.status = 'spam';
         } else if(action === 'pin') {
             post.isPinned = !post.isPinned;
         }
@@ -54,6 +58,43 @@ router.patch('/post/:id', auth, adminAuth, async (req, res) => {
         await post.save();
         res.json(post);
     } catch(err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+router.delete('/post/:id', auth, adminAuth, async (req, res) => {
+    try {
+        const post = await Post.findByIdAndDelete(req.params.id);
+        if(!post) return res.status(404).json({ msg: 'Post not found' });
+        res.json({ msg: 'Post permanently deleted' });
+    } catch(err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+router.post('/warn/:username', auth, adminAuth, async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username });
+        if(!user) return res.status(404).json({ msg: 'User not found' });
+
+        user.warnings += 1;
+        if(user.warnings >= 3) {
+            user.isSuspicious = true;
+            user.isRestricted = true;
+        }
+        await user.save();
+
+        const Notification = require('../models/Notification');
+        await new Notification({
+            recipient: user.username,
+            sender: 'Administrator',
+            type: 'admin_warning',
+            context: `issued an official warning. You have ${user.warnings} warning(s).`
+        }).save();
+
+        res.json(user);
+    } catch(err) {
+        console.log(err);
         res.status(500).send('Server Error');
     }
 });

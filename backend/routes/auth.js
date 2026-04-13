@@ -23,7 +23,7 @@ router.post('/signup', async (req, res) => {
 
         const payload = { user: { id: user.id, username: user.username, role: user.role } };
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: 360000 }, (err, token) => {
-            if (err) throw err;
+            if (err) return res.status(500).json({ msg: 'Server Error' });
             res.json({ token, user: payload.user });
         });
     } catch (err) {
@@ -40,7 +40,10 @@ router.post('/login', async (req, res) => {
         if (email === 'admin@gmail.com' && password === 'admin123') {
             const payload = { user: { id: 'admin_id', username: 'Administrator', role: 'admin' } };
             return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: 360000 }, (err, token) => {
-                if (err) throw err;
+                if (err) {
+                    console.error("JWT Sign error:", err);
+                    return res.status(500).json({ msg: 'Server Error' });
+                }
                 res.json({ token, user: payload.user });
             });
         }
@@ -53,12 +56,12 @@ router.post('/login', async (req, res) => {
 
         const payload = { user: { id: user.id, username: user.username, role: user.role } };
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: 360000 }, (err, token) => {
-            if (err) throw err;
+            if (err) return res.status(500).json({ msg: 'Server Error' });
             res.json({ token, user: payload.user });
         });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("CATCH BLOCK ERROR:", err);
+        res.status(500).json({ error: String(err), stack: err.stack });
     }
 });
 

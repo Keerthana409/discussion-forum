@@ -3,12 +3,21 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Post = require('../models/Post');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 const calculateSpamScore = (text) => {
     let score = 0;
     const lowerText = text.toLowerCase();
-    const keywords = ['buy now', 'free', 'click here'];
-    keywords.forEach(word => { if (lowerText.includes(word)) score += 2; });
+    const keywords = [
+        'buy', 'buy 1 get 1 free', 'buy now', 'free', 'click here', 
+        'earn money', 'discount', 'offer', 'prize', 'winner', 
+        'urgent', 'guaranteed', 'cash bonus', 'act now'
+    ];
+    keywords.forEach(word => {
+        // use regex to match whole words for short words like 'buy' or 'free' to reduce false positives
+        const regex = new RegExp(`\\b${word}\\b`, 'i');
+        if (regex.test(lowerText)) score += 2;
+    });
     if (/(http|https|www\.)[^\s]+/i.test(text)) score += 3;
     const words = text.split(/\s+/);
     for (let i = 0; i < words.length - 2; i++) {
@@ -75,6 +84,17 @@ router.post('/', auth, async (req, res) => {
         });
 
         const post = await newPost.save();
+
+        if (finalStatus !== 'safe') {
+            await new Notification({
+                recipient: 'Administrator',
+                sender: 'System AI',
+                type: 'admin_spam_alert',
+                context: `flagged post "${post.title}" as ${finalStatus}`,
+                postId: post._id.toString()
+            }).save();
+        }
+
         res.json(post);
     } catch (err) {
         console.log(err);
@@ -106,6 +126,9 @@ router.post('/:id/vote', auth, async (req, res) => {
             if(post.author !== 'Administrator') {
                 await User.findOneAndUpdate({ username: post.author }, { $inc: { reputation: 1 } });
             }
+            if (req.user.username !== post.author) {
+                await new Notification({ recipient: post.author, sender: req.user.username, type: 'upvote', context: `upvoted your post: "${post.title}"` }).save();
+            }
         } else {
             post.dislikes += weight;
             post.downvoters.push(req.user.username);
@@ -123,12 +146,23 @@ router.post('/:id/react', auth, async (req, res) => {
     try {
         const type = req.body.type;
         let post = await Post.findById(req.params.id);
-        if (!post) return res.status(404).json({ msg: 'Post not found' });
-        
-        if(!post.reactions) post.reactions = {fire:0, laugh:0};
-        post.reactions[type] = (post.reactions[type] || 0) + 1;
-        await post.save();
-        res.json(post);
+        if (type !== 'fire' && type !== 'laugh') return res.status(400).json({ msg: 'Invalid reaction type' });
+
+        const update = {};
+        update[`reactions.${type}`] = 1;
+        const updatedPost = await Post.findOneAndUpdate(
+            { _id: req.params.id, reactedUsers: { $ne: req.user.username } },
+            { $inc: update, $push: { reactedUsers: req.user.username } },
+            { new: true }
+        );
+
+        if (!updatedPost) {
+            return res.status(400).json({ msg: 'Already reacted to this post' });
+        }
+
+        await new Notification({ recipient: updatedPost.author, sender: req.user.username, type: 'react', context: `reacted to your post: "${updatedPost.title}"`, postId: updatedPost._id.toString() }).save();
+
+        res.json(updatedPost);
     } catch (err) {
         res.status(500).send('Server Error');
     }
@@ -145,10 +179,13 @@ router.post('/:id/comment', auth, async (req, res) => {
 
         if (!targetCommentId) {
             post.comments.push(newComment);
+            await new Notification({ recipient: post.author, sender: req.user.username, type: 'comment', context: `commented on your post: "${post.title}"`, postId: post._id.toString() }).save();
         } else {
+            let commentAuthor = post.author;
             const insertReply = (commentsArr, targetId, reply) => {
                 for (let c of commentsArr) {
                     if (c.id === targetId) {
+                        commentAuthor = c.author;
                         if (!c.replies) c.replies = [];
                         c.replies.push(reply);
                         return true;
@@ -158,9 +195,43 @@ router.post('/:id/comment', auth, async (req, res) => {
                 return false;
             };
             insertReply(post.comments, targetCommentId, newComment);
+            await new Notification({ recipient: commentAuthor, sender: req.user.username, type: 'comment', context: `replied to your comment in: "${post.title}"`, postId: post._id.toString() }).save();
         }
         
         post.markModified('comments'); 
+        await post.save();
+        res.json(post);
+    } catch(err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// Admin Delete Comment recursive logic
+router.delete('/:id/comment/:commentId', auth, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ msg: 'Access denied. Admin only.' });
+        }
+        let post = await Post.findById(req.params.id);
+        if (!post) return res.status(404).json({ msg: 'Post not found' });
+
+        const deleteComment = (commentsArr, targetId) => {
+            for (let i = 0; i < commentsArr.length; i++) {
+                if (commentsArr[i].id === targetId) {
+                    commentsArr.splice(i, 1);
+                    return true;
+                }
+                if (commentsArr[i].replies && deleteComment(commentsArr[i].replies, targetId)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const deleted = deleteComment(post.comments, req.params.commentId);
+        if (!deleted) return res.status(404).json({ msg: 'Comment not found' });
+
+        post.markModified('comments');
         await post.save();
         res.json(post);
     } catch(err) {
@@ -176,12 +247,23 @@ router.post('/:id/report', auth, async (req, res) => {
 
         post.hasReport = true;
         post.reportReason = req.body.reason || "No reason provided";
+        post.reporter = req.body.reporter || req.user.username;
         post.status = 'under review';
 
         await post.save();
+
+        await new Notification({
+            recipient: 'Administrator',
+            sender: req.user.username,
+            type: 'admin_report_alert',
+            context: `reported post "${post.title}" for: ${post.reportReason}`,
+            postId: post._id.toString()
+        }).save();
+
         res.json(post);
     } catch(err) {
-        res.status(500).send('Server Error');
+        console.log(err);
+        res.status(500).json({ msg: 'Server Error', error: String(err), stack: err.stack });
     }
 });
 
